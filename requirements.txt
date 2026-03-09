@@ -4,3 +4,4 @@ pandas
 scikit-learn
 pyodbc
 python-dotenv
+google-generativeai

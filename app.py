@@ -113,3 +113,13 @@ if __name__ == "__main__":
         port=port,
         reload=True
     )
+
+#=========================================
+#8 . IMPORT ROUTER CHO MODULE CHATBOT
+#=========================================  
+from modules.library_chat.router import router as chat_router
+app.include_router(
+    chat_router,
+    prefix="/ai",
+    tags=["Chatbot"]
+)
