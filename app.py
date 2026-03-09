@@ -16,7 +16,7 @@ from modules.book_recommender.preprocess import create_feature_tags
 # ==========================================
 app = FastAPI(
     title="QLTV AI Service",
-    description="Dịch vụ AI gợi ý sách cho hệ thống Quản lý Thư viện",
+    description="Dịch vụ AI gợi ý sách và Chatbot cho hệ thống Quản lý Thư viện",
     version="1.0.0"
 )
 
@@ -37,9 +37,10 @@ app.add_middleware(
 recommender = BookRecommender()
 
 # ==========================================
-# 4. IMPORT ROUTER
+# 4. IMPORT ROUTER (Gom chung vào đây)
 # ==========================================
 from modules.book_recommender.router import router as book_router
+from modules.library_chat.router import router as chat_router # Import chatbot ở đây
 
 app.include_router(
     book_router,
@@ -47,79 +48,56 @@ app.include_router(
     tags=["Book Recommendation"]
 )
 
+app.include_router( # Đăng ký chatbot ở đây
+    chat_router,
+    prefix="/ai",
+    tags=["Chatbot"]
+)
+
 # ==========================================
 # 5. STARTUP EVENT
 # ==========================================
 @app.on_event("startup")
 async def startup_event():
-
     print("====================================")
     print("🚀 Đang khởi động AI Recommendation Service...")
     print("====================================")
-
     try:
-        # 1. Lấy dữ liệu sách từ database
         df_books = get_all_books_for_recommendation()
-
         if df_books.empty:
             print("⚠️ Không có dữ liệu sách trong database")
             return
-
         print(f"📚 Đã tải {len(df_books)} sách từ database")
-
-        # 2. Preprocess dữ liệu
         df_processed = create_feature_tags(df_books)
-
         print("🧠 Đang huấn luyện mô hình AI...")
-
-        # 3. Train model
         recommender.train(df_processed)
-
         print("✅ Mô hình gợi ý sách đã sẵn sàng")
-
     except Exception as e:
         print("❌ Lỗi khi khởi động AI model")
         print(e)
-
 
 # ==========================================
 # 6. API TEST
 # ==========================================
 @app.get("/")
 async def root():
-
     sample_ids = []
-
     if recommender.df is not None:
         sample_ids = recommender.df["MaSach"].head().tolist()
-
     return {
         "service": "QLTV AI Recommendation Service",
         "status": "online",
         "sample_book_ids": sample_ids
     }
 
-
 # ==========================================
 # 7. CHẠY SERVER
 # ==========================================
 if __name__ == "__main__":
-
     port = int(os.getenv("PORT", 8000))
-
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
         port=port,
         reload=True
     )
-
-#=========================================
-#8 . IMPORT ROUTER CHO MODULE CHATBOT
-#=========================================  
-from modules.library_chat.router import router as chat_router
-app.include_router(
-    chat_router,
-    prefix="/ai",
-    tags=["Chatbot"]
-)
