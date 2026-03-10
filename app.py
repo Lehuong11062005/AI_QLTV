@@ -11,12 +11,15 @@ from modules.book_recommender.model import BookRecommender
 from modules.book_recommender.repository import get_all_books_for_recommendation
 from modules.book_recommender.preprocess import create_feature_tags
 
+# Import model Nhận diện ảnh
+from modules.image_recognition.model import ImageRecognizer
+
 # ==========================================
 # 1. KHỞI TẠO FASTAPI
 # ==========================================
 app = FastAPI(
     title="QLTV AI Service",
-    description="Dịch vụ AI gợi ý sách và Chatbot cho hệ thống Quản lý Thư viện",
+    description="Dịch vụ AI gợi ý sách, Chatbot và Nhận diện ảnh cho hệ thống Quản lý Thư viện",
     version="1.0.0"
 )
 
@@ -35,12 +38,14 @@ app.add_middleware(
 # 3. KHỞI TẠO MODEL
 # ==========================================
 recommender = BookRecommender()
+image_recognizer = ImageRecognizer() 
 
 # ==========================================
-# 4. IMPORT ROUTER (Gom chung vào đây)
+# 4. IMPORT ROUTER (Gom chung tất cả vào đây)
 # ==========================================
 from modules.book_recommender.router import router as book_router
-from modules.library_chat.router import router as chat_router # Import chatbot ở đây
+from modules.library_chat.router import router as chat_router 
+from modules.image_recognition.router import router as image_router # Đã di chuyển xuống đây
 
 app.include_router(
     book_router,
@@ -48,10 +53,16 @@ app.include_router(
     tags=["Book Recommendation"]
 )
 
-app.include_router( # Đăng ký chatbot ở đây
+app.include_router( 
     chat_router,
     prefix="/ai",
     tags=["Chatbot"]
+)
+
+app.include_router(
+    image_router,
+    prefix="/ai",
+    tags=["Image Recognition"]
 )
 
 # ==========================================
@@ -60,18 +71,24 @@ app.include_router( # Đăng ký chatbot ở đây
 @app.on_event("startup")
 async def startup_event():
     print("====================================")
-    print("🚀 Đang khởi động AI Recommendation Service...")
+    print("🚀 Đang khởi động các AI Services...")
     print("====================================")
     try:
+        # --- 5.1 Khởi động Book Recommender ---
         df_books = get_all_books_for_recommendation()
         if df_books.empty:
             print("⚠️ Không có dữ liệu sách trong database")
-            return
-        print(f"📚 Đã tải {len(df_books)} sách từ database")
-        df_processed = create_feature_tags(df_books)
-        print("🧠 Đang huấn luyện mô hình AI...")
-        recommender.train(df_processed)
-        print("✅ Mô hình gợi ý sách đã sẵn sàng")
+        else:
+            print(f"📚 Đã tải {len(df_books)} sách từ database")
+            df_processed = create_feature_tags(df_books)
+            print("🧠 Đang huấn luyện mô hình Gợi ý sách...")
+            recommender.train(df_processed)
+            print("✅ Mô hình Gợi ý sách đã sẵn sàng")
+
+        # --- 5.2 Khởi động Image Recognizer (Đã thêm) ---
+        print("📸 Đang tải dữ liệu Nhận diện ảnh (Embeddings)...")
+        image_recognizer.load_embeddings()
+        
     except Exception as e:
         print("❌ Lỗi khi khởi động AI model")
         print(e)
@@ -85,9 +102,10 @@ async def root():
     if recommender.df is not None:
         sample_ids = recommender.df["MaSach"].head().tolist()
     return {
-        "service": "QLTV AI Recommendation Service",
+        "service": "QLTV AI Services",
         "status": "online",
-        "sample_book_ids": sample_ids
+        "sample_book_ids": sample_ids,
+        "image_ai_status": "ready" if image_recognizer.book_embeddings else "not ready (missing embeddings)"
     }
 
 # ==========================================
